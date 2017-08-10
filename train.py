@@ -1,10 +1,5 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jun 30 13:10:53 2017
 
-@author: zy
-"""
 import tensorflow as tf
 import numpy as np
 import data_batch
@@ -23,7 +18,7 @@ tf_doc_mask_4dims = tf.placeholder(tf.float32, [conf.batch_size, conf.doc_len, c
 tf_sum_mask_2dims = tf.placeholder(tf.float32, [conf.batch_size, conf.sum_len], name="sum_mask_2dims")
 
 #train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask_2dims, sum_mask_2dims, vocab = data_batch.data_batch()
-dir_cpu ="/home/yang/IJCNLP_2017/code/train_id_data/"
+dir_cpu ="~/train_id_data/"
 
 train_doc2id = np.loadtxt(dir_cpu+"train_doc2id.txt").astype('int32')
 train_deco_inputs2id = np.loadtxt(dir_cpu+"train_deco_inputs2id.txt").astype('int32')
@@ -49,12 +44,9 @@ grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), conf.max_grad_norm)
 optimizer = tf.train.AdamOptimizer(conf.lr)
 optimizer_tf = optimizer.apply_gradients(zip(grads, tvars))
 
-
-    
 with tf.Session(config=config_tf) as sess: 
     tf.global_variables_initializer().run()
     for i in range(conf.num_epoch):
-        
         train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask_2dims, sum_mask_2dims = \
             data_batch.batch_shuffle(train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask_2dims, sum_mask_2dims)
         
@@ -82,8 +74,7 @@ with tf.Session(config=config_tf) as sess:
             print var[-2].name
             print sess.run(var[-2][0])
             print '\n'
-            
-       
+           
         model_saver = tf.train.Saver()
         model_saver.save(sess,"model_e%d_i%d"%(i,k))
 
@@ -100,20 +91,4 @@ with tf.Session(config=config_tf) as sess:
             print " ".join(temp)
             print "\n"  
         
-
-        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-
-
-    
-
-    
-    
-    
+               
