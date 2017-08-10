@@ -1,8 +1,6 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
 class config(object):
-
     
     emb_dim = 128
     enco_hdim = 64
@@ -10,7 +8,6 @@ class config(object):
     beam_size = 3
     batch_size = 32
     
-
     filter_ngram = 5
     num_filters = 1
     num_layers = 5
@@ -25,3 +22,5 @@ class config(object):
     lr = 0.01
     max_grad_norm = 10.0
     model_path = "./model" 
+
+    
