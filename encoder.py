@@ -36,40 +36,4 @@ def cnn_encoder(input_x, mask_4dims):
             
             h = tf.nn.bias_add(conv, b)*tf.sigmoid(tf.nn.bias_add(conv_gated, b_gated))
     return h
-'''
-import numpy as np
-import tensorflow as tf
-h=np.array([[[1,2,3,4],[5,6,7,8],[9,10,11,12]],[[11,21,31,41],[51,61,71,81],[91,101,111,121]]]).astype("float32")
-h=np.reshape(h, [2,3,4,1])
-
-filter_shape = [2, 4, 1, 1]
-w_con = tf.get_variable(name="w_con", shape=filter_shape, initializer=tf.constant_initializer(1.0))
-conv = tf.nn.conv2d(
-        h,
-        w_con,
-        strides=[1, 1, 1, 1],
-        padding="SAME",
-        name="conv") 
-
-with tf.Session() as sess: 
-    tf.global_variables_initializer().run()
-    print sess.run(w_con)
-    print '\n'
-    print sess.run(conv)
-'''
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
