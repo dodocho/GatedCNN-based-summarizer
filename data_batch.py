@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-
 import os
 import numpy as np
-import Config
+import config
 import random
-conf = Config.config()
+conf = config.config()
 
 def create_data(data_dir, random_dir):
     with open(random_dir, 'r') as f_random:
@@ -36,17 +35,17 @@ def vocab_build(train_doc, vocab_size):
         vocab.append(word_freq[0])
     
     return vocab
-
+    
 def data_generation():
-    pub_dir = '/Users/zy/Desktop/'
+    pub_dir = '/Users/zy/Desktop'
     
-    train_dir=pub_dir+'training'
-    val_dir=pub_dir+'val'
-    test_dir=pub_dir+'test'
+    train_dir=pub_dir+'/IJCNLP_2017/training'
+    val_dir=pub_dir+'/IJCNLP_2017/val'
+    test_dir=pub_dir+'/IJCNLP_2017/test'
     
-    train_random=pub_dir+'random_sample_for_train.txt'
-    val_random=pub_dir+'random_sample_for_val.txt'
-    test_random=pub_dir+'random_sample_for_test.txt'
+    train_random=pub_dir+'/IJCNLP_2017/random_sample_for_train.txt'
+    val_random=pub_dir+'/IJCNLP_2017/random_sample_for_val.txt'
+    test_random=pub_dir+'/IJCNLP_2017/random_sample_for_test.txt'
     
     train_doc, train_sum=create_data(train_dir, train_random)
     val_doc, val_sum=create_data(val_dir, val_random)
@@ -57,11 +56,14 @@ def data_generation():
     vocab.append('<go>')
     vocab.append('<eos>')
     vocab.append('<pad>')
+    
     return (train_doc, train_sum), (val_doc, val_sum), (test_doc, test_sum), vocab
+
 
 def np_int(data):
     return np.array(data).astype('int32')    
 
+    
 def word2id(docu, summ, vocab, is_training=False):
     vocab_set = set(vocab)
     docu1=[]
@@ -81,7 +83,7 @@ def word2id(docu, summ, vocab, is_training=False):
             else:
                 d1.append(vocab.index('<unk>'))
         docu1.append(d1)
-   
+
     if is_training:
         y_true_labels=[]
         deco_inputs=[]
@@ -115,15 +117,15 @@ def word2id(docu, summ, vocab, is_training=False):
             y_true_labels.append(y_true1)    
             deco_inputs.append(deco_input1)                    
         
-        return np_int(docu1), np_int(deco_inputs), np_int(y_true_labels), docs_mask, summ_mask    
-
+        return np_int(docu1), np_int(deco_inputs), np_int(y_true_labels), docs_mask, summ_mask
+    
 def batch_shuffle(train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask, sum_mask):
     l = len(train_doc2id)
     data_shuffle=[]
     for i in range(l):
         data_shuffle.append([train_doc2id[i], train_y_true2id[i], train_deco_inputs2id[i], doc_mask[i], sum_mask[i]])
-     
     random.shuffle(data_shuffle)
+    
     train_doc2id1=[]
     train_y_true2id1=[]
     train_deco_inputs2id1=[]
@@ -143,16 +145,17 @@ def data_batch():
     print "data_batch..."
     (train_doc, train_sum), (val_doc, val_sum), (test_doc, test_sum), vocab = data_generation()
     print "finished!"
+    
     print "convert to id..."           
     train_doc2id, train_deco_inputs2id, train_y_true2id, doc_mask, sum_mask = word2id(train_doc, train_sum, vocab, is_training=True)
     #val_doc2id, val_sum2id = word2id(val_doc, val_sum, vocab)
     #test_doc2id, test_sum2id = word2id(test_doc, test_sum, vocab)
     print "finished!"  
+    
     print "shuffle..."        
     train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask, sum_mask = batch_shuffle(train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask, sum_mask)
     print "finished!"
-    return train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask, sum_mask, vocab
-
-
-
     
+    return train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask, sum_mask, vocab
+   
+  
