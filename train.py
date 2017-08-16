@@ -16,7 +16,7 @@ tf_doc_mask_4dims = tf.placeholder(tf.float32, [conf.batch_size, conf.doc_len, c
 tf_sum_mask_2dims = tf.placeholder(tf.float32, [conf.batch_size, conf.sum_len], name="sum_mask_2dims")
 
 #data load
-dir_data = "/Users/zy/Desktop/IJCNLP_2017/code/train_30000_params_tuning/"
+dir_data = "~/train_30000_params_tuning/"
 train_doc2id = np.loadtxt(dir_data+"train_doc2id.txt").astype('int32')
 train_deco_inputs2id = np.loadtxt(dir_data+"train_deco_inputs2id.txt").astype('int32')
 train_y_true2id = np.loadtxt(dir_data+"train_y_true2id.txt").astype('int32')
@@ -38,8 +38,8 @@ loss = decoder.gru_decoder(enco_h[:,:,:,0], tf_doc_mask_4dims[:,:,0,0], tf_deco_
 #gradient descent
 tvars = tf.trainable_variables()
 grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), conf.max_grad_norm)
-optimizer = tf.train.AdamOptimizer(0.001)
-#optimizer = tf.train.GradientDescentOptimizer(0.1)
+optimizer = tf.train.AdamOptimizer(conf.lr)
+#optimizer = tf.train.GradientDescentOptimizer(conf.lr)
 #optimizer = tf.train.MomentumOptimizer(conf.lr, conf.momentum)
 optimizer_tf = optimizer.apply_gradients(zip(grads, tvars))
 
@@ -89,8 +89,7 @@ with tf.Session(config=config_tf) as sess:
             print var[-6].name
             print sess.run(var[-6][0][:10])
             print '\n'
-            
-        
+ 
         model_saver = tf.train.Saver()
         model_saver.save(sess,"model_e%d_i%d"%(i,k))
 
