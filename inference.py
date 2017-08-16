@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-
 import tensorflow as tf
-import Config
-conf = Config.config()
+import config
+conf = config.config()
 
+#rebuild computational graph
+#rebuild encoder
 def inference_encoder(infer_input2id):
-    #in_channels=1
     with tf.device('/cpu:0'), tf.variable_scope("embedding", reuse=True):
         emb_w = tf.get_variable(name="emb_W")
         h = tf.nn.embedding_lookup(emb_w, infer_input2id)
@@ -13,9 +13,12 @@ def inference_encoder(infer_input2id):
         h = tf.expand_dims(h, -1)
     
     for i in range(conf.num_layers):
-        #(filter_w, num_filters) = (1, conf.num_filters) if i<(conf.num_layers-1) else (conf.emb_dim-conf.enco_hdim+1, 1)
-        #filter_shape = [conf.filter_ngram, filter_w, in_channels , num_filters]
-        
+        '''
+        filter_w = conf.emb_dim #if i<(conf.num_layers-1) else conf.emb_dim-conf.enco_hdim+1
+        in_channels = 1
+        num_filters = conf.num_filters if i<(conf.num_layers-1) else 1
+        filter_shape = [conf.filter_ngram, filter_w, in_channels , num_filters]
+        '''
         with tf.variable_scope("layer_%d" % i, reuse=True):
             # Convolution Layer
             W = tf.get_variable(name="w_%d" % i)
@@ -24,7 +27,7 @@ def inference_encoder(infer_input2id):
                 h,
                 W,
                 strides=[1, 1, 1, 1],
-                padding="VALID",
+                padding="SAME",
                 name="conv")
             
             W_gated = tf.get_variable(name="w_gated_%d" % i)
@@ -33,11 +36,11 @@ def inference_encoder(infer_input2id):
                 h,
                 W_gated,
                 strides=[1, 1, 1, 1],
-                padding="VALID",
+                padding="SAME",
                 name="conv_gated")
             #gated CNN
             h = tf.nn.bias_add(conv, b)*tf.sigmoid(tf.nn.bias_add(conv_gated, b_gated))
-        #in_channels = conf.num_filter
+    
     return h
             
 
@@ -46,65 +49,66 @@ def beam_decoder(enco_h, vocab, session):
     reverse_vocab = dict([word, _id] for _id, word in enumerate(vocab))
     
     with tf.variable_scope("decode", reuse=True):
-        wz1 = tf.get_variable(name="wz1") 
-        bz1 = tf.get_variable(name="bz1")
-        wr1 = tf.get_variable(name="wr1") 
-        br1 = tf.get_variable(name="br1")
-        wh1 = tf.get_variable(name="wh1") 
-        bh1 = tf.get_variable(name="bh1")
+        wz = tf.get_variable(name="wz") 
+        uz = tf.get_variable(name="uz")
+        wr = tf.get_variable(name="wr") 
+        ur = tf.get_variable(name="ur")
+        wh = tf.get_variable(name="wh") 
+        uh = tf.get_variable(name="uh")
         h0 = tf.get_variable(name="h0")
-        att_w = tf.get_variable(name="att_w") 
+        w_att = tf.get_variable(name="w_att") 
+        v_att = tf.get_variable(name="v_att") 
         softmax_w = tf.get_variable(name="softmax_w") 
         softmax_b = tf.get_variable(name="softmax_b")
-  
+        
     with tf.device('/cpu:0'), tf.variable_scope("embedding", reuse=True):
         emb_w = tf.get_variable(name="emb_W") 
 
-    def decode_step(seq, prev_h_state):
-        att_temp = tf.matmul(tf.matmul(enco_h, att_w), tf.transpose(prev_h_state,[1,0]))
-        att_score = tf.nn.softmax(att_temp, 0)
-        att_cont = tf.reduce_sum(enco_h*att_score, 0)
+    def decode_step(seq, prev_h):
+        gru_hi_repeat = tf.tile(prev_h, [enco_h.get_shape().as_list()[0], 1])
+        cat = tf.concat([enco_h, gru_hi_repeat], axis=1)#[doc_len, enco_hdim+rnn_hdim]
+        
+        att = tf.matmul(tf.tanh(tf.matmul(cat, w_att)), v_att)#[doc_len, 1]
+        att_score = tf.nn.softmax(att)
+        #att_score_2dims = tf.expand_dims(att_score, -1)
+        att_cont = tf.reduce_sum(enco_h*att_score, 0)#[1, enco_hdim]
         att_cont = tf.expand_dims(att_cont, 0)
-      
-        deco_input = tf.nn.embedding_lookup(emb_w, seq[-1][0])
-        deco_input = tf.expand_dims(deco_input, 0)
         
-        #(emb_dim + enco_hdim + rnn_hdim)
-        cat = tf.concat([deco_input, att_cont, prev_h_state], axis=1)
+        deco_input_i = tf.nn.embedding_lookup(emb_w, seq[-1][0])
+        deco_input_i = tf.expand_dims(deco_input_i, 0)#[1, emb_dim]
         
-        #batch_size * rnn_hdim for both
-        update = tf.sigmoid(tf.matmul(cat, wz1) + bz1)
-        reset = tf.sigmoid(tf.matmul(cat, wr1) + br1)
+        #emb_dim + enco_hdim
+        x_cat = tf.concat([deco_input_i, att_cont], axis=1)#[1, emb_dim + enco_hdim]
         
-        #batch_size * (emb_dim + enco_hdim + rnn_hdim)
-        cat_cadi=tf.concat([deco_input, att_cont, prev_h_state * reset],axis=1)
+        # both update and reset: [batch_size, rnn_hdim]
+        update = tf.sigmoid(tf.matmul(x_cat, wz) + tf.matmul(prev_h, uz))
+        reset = tf.sigmoid(tf.matmul(x_cat, wr) + tf.matmul(prev_h, ur))
+    
+        #h_cadi: [batch_size, rnn_hdim]
+        h_cadi = tf.tanh(tf.matmul(x_cat, wh) + tf.matmul(prev_h * reset, uh))
         
-        #batch_size * rnn_hdim
-        ht_cadidation = tf.tanh(tf.matmul(cat_cadi, wh1) + bh1)
-        
-        #batch_size * rnn_hdim
-        ht = update * prev_h_state + (1-update) * ht_cadidation
+        #ht [batch_size * rnn_hdim
+        ht = update * prev_h + (1-update) * h_cadi
         
         pred = tf.matmul(ht, softmax_w) + softmax_b
         prob = tf.nn.softmax(pred)
-        
+   
         return prob[0,:], ht
-    ###    
-    
+
     def check_all_stop(seqs):
         for seq in seqs:
             if not seq[-1]:
                 return False
         return True
-   
+
     def seq_mul(seq):
         out = 1.0
         for x in seq:
             out *= x
         return out
+    #seq: [[word,word],[word,word],[word,word]]
+    #output: [[word,word,word],[word,word,word],[word,word,word]]
     
-    #seq: [[w1,w2],[w1,w2],[w1,w2]]
-    #output: [[w1,w2,w3],[w1,w2,w3],[w1,w2,w3]
     def beam_search_step(top_seqs):
         all_seqs = []
         for seq in top_seqs:
@@ -123,7 +127,7 @@ def beam_decoder(enco_h, vocab, session):
                 word_score = word_prob[1]
                 score = seq_score * word_score
                 temp = word_prob + [deco_h_state]
-                
+     
                 rs_seq = seq + [temp]
                 stop = (word_index == reverse_vocab['<eos>'])
                 all_seqs.append([rs_seq, score, stop])
@@ -137,9 +141,8 @@ def beam_decoder(enco_h, vocab, session):
     ####################################
     deco_h_state = tf.expand_dims(h0, 0)
     top_seqs = [[[reverse_vocab['<go>'], 1.0, deco_h_state]]]
-    
-    generate_l=50
-    for l in range(generate_l):
+   
+    for l in range(conf.generate_l):
         top_seqs, all_stop = beam_search_step(top_seqs)
         if all_stop=='True':
             break
@@ -151,4 +154,4 @@ def main(infer_input, vocab, sess):
     enco_h_infer = inference_encoder(infer_input)
     top_seqs = beam_decoder(enco_h_infer, vocab, sess)
     return top_seqs
-            
+ 
