@@ -39,13 +39,13 @@ def vocab_build(train_doc, vocab_size):
 def data_generation():
     pub_dir = '/Users/zy/Desktop'
     
-    train_dir=pub_dir+'/IJCNLP_2017/training'
-    val_dir=pub_dir+'/IJCNLP_2017/val'
-    test_dir=pub_dir+'/IJCNLP_2017/test'
+    train_dir=pub_dir+'/training'
+    val_dir=pub_dir+'/val'
+    test_dir=pub_dir+'/test'
     
-    train_random=pub_dir+'/IJCNLP_2017/random_sample_for_train.txt'
-    val_random=pub_dir+'/IJCNLP_2017/random_sample_for_val.txt'
-    test_random=pub_dir+'/IJCNLP_2017/random_sample_for_test.txt'
+    train_random=pub_dir+'/random_sample_for_train.txt'
+    val_random=pub_dir+'/random_sample_for_val.txt'
+    test_random=pub_dir+'/random_sample_for_test.txt'
     
     train_doc, train_sum=create_data(train_dir, train_random)
     val_doc, val_sum=create_data(val_dir, val_random)
