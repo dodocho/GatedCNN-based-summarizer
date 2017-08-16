@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 class config(object):
-    
     emb_dim = 128
     enco_hdim = emb_dim
     vocab_size = 30000
