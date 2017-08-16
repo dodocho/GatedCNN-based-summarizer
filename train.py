@@ -1,49 +1,51 @@
 # -*- coding: utf-8 -*-
-
 import tensorflow as tf
 import numpy as np
-import data_batch
-import Config
-conf = Config.config()
+import config, encoder, decoder, data_batch, inference
+conf = config.config()
+
+#GPUs grows 
 config_tf = tf.ConfigProto()
 config_tf.gpu_options.allow_growth = True
-#config_tf.inter_op_parallelism_threads = 1
-#config_tf.intra_op_parallelism_threads = 1
 
-#placeholder for input
+#inputs of computational graph
 tf_input_x = tf.placeholder(tf.int32, [conf.batch_size, conf.doc_len], name="input_x")
-tf_y_true = tf.placeholder(tf.int32, [conf.batch_size, conf.sum_len], name="y_true")
 tf_deco_input = tf.placeholder(tf.int32, [conf.batch_size, conf.sum_len], name="deco_input")
+tf_y_true = tf.placeholder(tf.int32, [conf.batch_size, conf.sum_len], name="y_true")
 tf_doc_mask_4dims = tf.placeholder(tf.float32, [conf.batch_size, conf.doc_len, conf.emb_dim, 1], name="doc_mask_4dims")
 tf_sum_mask_2dims = tf.placeholder(tf.float32, [conf.batch_size, conf.sum_len], name="sum_mask_2dims")
 
-#train_doc2id, train_y_true2id, train_deco_inputs2id, doc_mask_2dims, sum_mask_2dims, vocab = data_batch.data_batch()
-dir_cpu ="~/train_id_data/"
-
-train_doc2id = np.loadtxt(dir_cpu+"train_doc2id.txt").astype('int32')
-train_deco_inputs2id = np.loadtxt(dir_cpu+"train_deco_inputs2id.txt").astype('int32')
-train_y_true2id = np.loadtxt(dir_cpu+"train_y_true2id.txt").astype('int32')
-doc_mask_2dims = list(np.loadtxt(dir_cpu+"doc_mask_2dims.txt").astype('int32'))
-sum_mask_2dims = list(np.loadtxt(dir_cpu+"sum_mask_2dims.txt").astype('int32'))
-vocab = open(dir_cpu+'vocab.txt', 'r').read().split()
-
+#data load
+dir_data = "/Users/zy/Desktop/IJCNLP_2017/code/train_30000_params_tuning/"
+train_doc2id = np.loadtxt(dir_data+"train_doc2id.txt").astype('int32')
+train_deco_inputs2id = np.loadtxt(dir_data+"train_deco_inputs2id.txt").astype('int32')
+train_y_true2id = np.loadtxt(dir_data+"train_y_true2id.txt").astype('int32')
+doc_mask_2dims = list(np.loadtxt(dir_data+"doc_mask_2dims.txt").astype('int32'))
 dims_expanded = np.array([np.zeros((conf.emb_dim,1)), np.ones((conf.emb_dim,1))])
-conf.vocab_size = len(vocab)
-iterations = len(train_doc2id)/conf.batch_size
+doc_mask_4dims = dims_expanded[doc_mask_2dims]
+sum_mask_2dims = list(np.loadtxt(dir_data+"sum_mask_2dims.txt").astype('int32'))
+vocab = open(dir_data+'vocab.txt', 'r').read().split()
 
-#Computational graph
-import cnn_encoder
-import gru_decoder
+#encoder part
+print "encoder start..."
+enco_h = encoder.cnn_encoder(tf_input_x, tf_doc_mask_4dims)
+enco_h = enco_h*tf_doc_mask_4dims
 
-enco_h, mask_h = cnn_encoder.cnn_encoder(tf_input_x, tf_doc_mask_4dims)
-loss = gru_decoder.gru_decoder(enco_h, mask_h, tf_deco_input, tf_sum_mask_2dims, tf_y_true)
+#decoder part
+print "decoder start..."
+loss = decoder.gru_decoder(enco_h[:,:,:,0], tf_doc_mask_4dims[:,:,0,0], tf_deco_input, tf_sum_mask_2dims, tf_y_true)
 
-#Adam Optimizer with gradients clip
+#gradient descent
 tvars = tf.trainable_variables()
 grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), conf.max_grad_norm)
-optimizer = tf.train.AdamOptimizer(conf.lr)
+optimizer = tf.train.AdamOptimizer(0.001)
+#optimizer = tf.train.GradientDescentOptimizer(0.1)
+#optimizer = tf.train.MomentumOptimizer(conf.lr, conf.momentum)
 optimizer_tf = optimizer.apply_gradients(zip(grads, tvars))
 
+
+#
+iterations = len(train_doc2id)/conf.batch_size
 with tf.Session(config=config_tf) as sess: 
     tf.global_variables_initializer().run()
     for i in range(conf.num_epoch):
@@ -60,29 +62,42 @@ with tf.Session(config=config_tf) as sess:
                                            tf_doc_mask_4dims:doc_mask_4dims[k:k+conf.batch_size],
                                            tf_sum_mask_2dims:sum_mask_2dims[k:k+conf.batch_size]})
     
-            
             print "epoch:"+str(i)+" "+"iteration:"+str(k/conf.batch_size)
+            print "loss%f"%l[0]
+            #print sess.run(tf.trainable_variables()[-3])
             print 'enco_h:'
-            print l[1][0]
+            print l[1][0][0][:10]
             
-            print l[0]
             var = tf.trainable_variables()
             
             print var[0].name
-            print sess.run(var[0][0])
+            print sess.run(var[0][0][:10])
             print '\n'
+            
+            print var[1].name
+            print sess.run(var[0][0][:10])
+            print '\n'
+            
             print var[-2].name
-            print sess.run(var[-2][0])
+            print sess.run(var[-2][0][:10])
             print '\n'
-           
+            
+            print var[-4].name
+            print sess.run(var[-4][0][:10])
+            print '\n'
+            
+            print var[-6].name
+            print sess.run(var[-6][0][:10])
+            print '\n'
+            
+        
         model_saver = tf.train.Saver()
         model_saver.save(sess,"model_e%d_i%d"%(i,k))
 
-        import beam_search
         with tf.Session() as sess1:
             model_saver = tf.train.Saver()
             model_saver.restore(sess1, "model_e%d_i%d"%(i,k))
-            beam_seqs = beam_search.main(train_doc2id[0], vocab, sess1)    
+            beam_seqs = inference.main(train_doc2id[299][:147], vocab, sess1)    
             
         for seq in beam_seqs:
             temp=[]
@@ -90,5 +105,3 @@ with tf.Session(config=config_tf) as sess:
                 temp.append(vocab[word[0]])
             print " ".join(temp)
             print "\n"  
-        
-               
